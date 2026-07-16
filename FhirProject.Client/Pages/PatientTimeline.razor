@@ -1,0 +1,137 @@
+@page "/patients/{PatientId}"
+@using FhirProject.Shared.Dtos
+@using FhirProject.Client.Services
+@inject ApiClient Api
+
+<PageTitle>Patient Timeline</PageTitle>
+
+<a href="/">&larr; Back to search</a>
+
+@if (_isLoading)
+{
+    <p><em>Loading patient timeline...</em></p>
+}
+else if (_errorMessage is not null)
+{
+    <div class="alert alert-danger mt-3">@_errorMessage</div>
+}
+else if (_timeline is not null)
+{
+    <h1>@_timeline.PatientName</h1>
+    <p class="text-muted">Patient ID: @_timeline.PatientId</p>
+
+    <h3>Encounters</h3>
+    @if (_timeline.Encounters.Count == 0)
+    {
+        <p class="text-muted">No encounters on record.</p>
+    }
+    else
+    {
+        <ul class="list-group mb-4" style="max-width: 640px;">
+            @foreach (var encounter in _timeline.Encounters)
+            {
+                <li class="list-group-item">
+                    <strong>@encounter.Type</strong> &mdash; @encounter.Status
+                    <div class="text-muted small">@encounter.PeriodStart to @encounter.PeriodEnd</div>
+                </li>
+            }
+        </ul>
+    }
+
+    <h3>Conditions</h3>
+    @if (_timeline.Conditions.Count == 0)
+    {
+        <p class="text-muted">No conditions on record.</p>
+    }
+    else
+    {
+        <ul class="list-group mb-4" style="max-width: 640px;">
+            @foreach (var condition in _timeline.Conditions)
+            {
+                <li class="list-group-item">
+                    @condition.Text
+                    @if (condition.SnomedCode is not null)
+                    {
+                        <span class="badge bg-info text-dark ms-2">SNOMED CT @condition.SnomedCode</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+
+    <h3>Observations</h3>
+    @if (_timeline.Observations.Count == 0)
+    {
+        <p class="text-muted">No observations on record.</p>
+    }
+    else
+    {
+        <ul class="list-group mb-4" style="max-width: 640px;">
+            @foreach (var observation in _timeline.Observations)
+            {
+                <li class="list-group-item">
+                    @observation.Text: @observation.Value @observation.Unit
+                    @if (observation.LoincCode is not null)
+                    {
+                        <span class="badge bg-secondary ms-2">LOINC @observation.LoincCode</span>
+                    }
+                    <div class="text-muted small">@observation.EffectiveDate</div>
+                </li>
+            }
+        </ul>
+    }
+
+    <h3>Medications</h3>
+    @if (_timeline.Medications.Count == 0)
+    {
+        <p class="text-muted">No medication requests on record.</p>
+    }
+    else
+    {
+        <ul class="list-group mb-4" style="max-width: 640px;">
+            @foreach (var medication in _timeline.Medications)
+            {
+                <li class="list-group-item">
+                    @medication.Text (@medication.Status)
+                    @if (medication.RxNormCode is not null)
+                    {
+                        <span class="badge bg-success ms-2">RxNorm @medication.RxNormCode</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter]
+    public string PatientId { get; set; } = string.Empty;
+
+    private PatientTimelineDto? _timeline;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _timeline = null;
+
+        try
+        {
+            _timeline = await Api.GetPatientTimelineAsync(PatientId);
+            if (_timeline is null)
+            {
+                _errorMessage = $"No patient found with ID '{PatientId}'.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load patient timeline: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

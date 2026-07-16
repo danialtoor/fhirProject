@@ -1,0 +1,106 @@
+@page "/"
+@using FhirProject.Shared.Dtos
+@using FhirProject.Client.Services
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Patient Search</PageTitle>
+
+<h1>Patient Search</h1>
+<p class="text-muted">Search the public HAPI FHIR R4 test server by last name.</p>
+
+<div class="input-group mb-3" style="max-width: 480px;">
+    <input class="form-control" placeholder="e.g. Smith" @bind="_searchTerm" @bind:event="oninput"
+           @onkeydown="OnKeyDown" />
+    <button class="btn btn-primary" @onclick="SearchAsync" disabled="@_isLoading">Search</button>
+</div>
+
+@if (_isLoading)
+{
+    <p><em>Searching...</em></p>
+}
+else if (_errorMessage is not null)
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+else if (_hasSearched && _results.Count == 0)
+{
+    <p>No patients found for "@_searchTerm".</p>
+}
+
+@if (_results.Count > 0)
+{
+    <table class="table table-striped" style="max-width: 720px;">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Gender</th>
+                <th>Birth Date</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var patient in _results)
+            {
+                <tr>
+                    <td>@patient.FullName</td>
+                    <td>@patient.Gender</td>
+                    <td>@patient.BirthDate</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewTimeline(patient.Id)">
+                            View timeline
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private string _searchTerm = string.Empty;
+    private List<PatientSummaryDto> _results = [];
+    private bool _isLoading;
+    private bool _hasSearched;
+    private string? _errorMessage;
+
+    private async Task OnKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchAsync();
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_searchTerm))
+        {
+            return;
+        }
+
+        _isLoading = true;
+        _errorMessage = null;
+        _hasSearched = true;
+        StateHasChanged();
+
+        try
+        {
+            _results = await Api.SearchPatientsAsync(_searchTerm);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Search failed: {ex.Message}";
+            _results = [];
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ViewTimeline(string patientId)
+    {
+        Navigation.NavigateTo($"/patients/{patientId}");
+    }
+}
